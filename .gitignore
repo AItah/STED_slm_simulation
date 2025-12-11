@@ -1,3 +1,7 @@
+# files to exclude
+*slm_farfield_*.bmp
+*slm_vortex_*.bmp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
