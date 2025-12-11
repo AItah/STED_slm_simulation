@@ -1,0 +1,9 @@
+{
+  "Nx": 1272,
+  "Ny": 1024,
+  "px_side_m": 1.25e-5,
+  "py_side_m": 1.25e-5,
+  "Fill_factor_percent": 96.8,
+  "beam_diameter_mm": 3.0,
+  "c2pi2unit": 204
+}
