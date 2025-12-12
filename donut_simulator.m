@@ -198,7 +198,7 @@ if use_digital_lens
 end
 
 % make circular mask
-mask = make_circular_mask(coords, beam, sqrt(beam.w0x_1e2_m.^2+beam.w0y_1e2_m.^2)/sqrt(2));
+mask = make_circular_mask(coords, beam, sqrt(beam.w0x_1e2_m.^2+beam.w0y_1e2_m.^2)*2);
 if b_plot
     sub_figure = plot_intensity_with_1e2_contour(coords, mask, sprintf('phase mask'),1,sub_figure);
 end
