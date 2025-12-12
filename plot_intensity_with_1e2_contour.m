@@ -1,4 +1,4 @@
-function plot_intensity_with_1e2_contour(coords, I, fig_title)
+function [sub_figure] = plot_intensity_with_1e2_contour(coords, I, fig_title, fig_num, sub_figure)
 %PLOT_INTENSITY_WITH_1E2_CONTOUR Show intensity and 1/e^2 perimeter.
 %
 %   plot_intensity_with_1e2_contour(coords, I, fig_title)
@@ -48,7 +48,14 @@ function plot_intensity_with_1e2_contour(coords, I, fig_title)
     [Xmm, Ymm] = meshgrid(x_mm, y_mm);
 
     % --- Plot ---
-    figure;
+    if nargin >4
+        figure(fig_num);
+        sub_figure.i = sub_figure.i+1;
+        subplot(sub_figure.x,sub_figure.y,sub_figure.i);
+    else
+        figure;
+    end
+    
     imagesc(x_mm, y_mm, Inorm);
     axis image;
     set(gca, 'YDir', 'normal');

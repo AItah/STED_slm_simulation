@@ -4,6 +4,20 @@ close all
 clear all
 clc
 
+%% load calibration mask for 770nm
+correction_path = [pwd '\Correction_patterns\CAL_LSH0805598_770nm.bmp'];
+calib_mask = load_grayscale_bmp(correction_path);
+% % optional
+% imagesc(calib_mask);
+% colormap(gca,gray)
+% colorbar
+
+%% plot flags and settings
+b_plot = false;
+sub_figure = struct();
+sub_figure.x = 2;
+sub_figure.y = 3;
+sub_figure.i = 0;
 use_log_view = true;       % toggle log or linear view
 
 %% ================= Steering user inputs =================
@@ -30,25 +44,31 @@ do_fresnel       = false;
 z_prop           = 0.10;     % [m]
 
 %% --- Phase-only encoding (superposition kinoform) ---
-dc_bias = 1.0;     % amplitude of reference wave (controls zero-order strength)
+dc_bias = 0.5;     % amplitude of reference wave (controls zero-order strength)
 gamma   = 1.0;     % weight of desired field (controls diffracted order strength)
 
 %% === Load components ===
 slm = load_slm_params('LCOS_SLM_X15213.json');
 beam = load_gaussian_beam_params('GaussianBeam.json');
-% coords_ = make_coordinates(slm.Nx, slm.Ny, slm.px_side_m, slm.py_side_m, false);
+
+% % optional
+beam_L = beam;
+beam_L.center_x_m=-slm.Nx*slm.px_side_m/4;
+beam_R = beam;
+beam_R.center_x_m= slm.Nx*slm.px_side_m/4;
+% coords_ = make_coordinates(slm.Nx, slm.Ny, slm.px_side_m, slm.py_side_m, true);
 % beam_in_ = make_gaussian_input_beam(coords_, beam);
-% % % optional: flat input
-% % edge_width_px = 20;
-% % beam_in_ = make_flat_soft_input_beam(coords_, slm.beam_diameter_mm, edge_width_px);
+% % optional: flat input
+% edge_width_px = 20;
+% beam_in_ = make_flat_soft_input_beam(coords_, slm.beam_diameter_mm, edge_width_px);
 % plot_intensity_with_1e2_contour(coords_, beam_in_.I, sprintf('beam_in_'));
 
 %% === input beam + Spatial filter + expander parameters ===
 % 4f optics
 f1        = 100e-3;
-f2        = 100e-3;
+f2        = 250e-3;
 M_4f      = f2 / f1;
-pinhole_d = 25e-3;
+pinhole_d = 25e-6;
 
 % Effective magnification for the *grid* (ensure we never shrink the grid)
 M_grid = max(1, M_4f);     % >= 1 always
@@ -56,25 +76,46 @@ M_grid = max(1, M_4f);     % >= 1 always
 % input beam + its coordinates
 px_in = slm.px_side_m / M_grid;
 py_in = slm.py_side_m / M_grid;
-coords_4f_in = make_coordinates(round(slm.Nx*M_grid), round(slm.Ny*M_grid), px_in, py_in,false);
+coords_4f_in = make_coordinates(round(slm.Nx*M_grid), round(slm.Ny*M_grid), px_in, py_in,true);
+% edge_width_px = 5;
+% beam_in = make_flat_soft_input_beam(coords_4f_in, slm.beam_diameter_mm, edge_width_px);
 beam_in = make_gaussian_input_beam(coords_4f_in, beam);
-% % optional: plot
-% plot_intensity_with_1e2_contour(coords_4f_in, beam_in.I, 'input Beam');
-% show_1e2_radius(coords_4f_in,beam_in.I, gca)
+
+% optional:
+beam_in_L = make_gaussian_input_beam(coords_4f_in, beam_L);
+beam_in_R = make_gaussian_input_beam(coords_4f_in, beam_R);
+beam_in.I = beam_in_L.I + beam_in_R.I;
+
+if (b_plot)
+    sub_figure = plot_intensity_with_1e2_contour(coords_4f_in, beam_in.I, 'input two gaussians',1,sub_figure);
+end
+ 
+% Add, for example, 5% amplitude noise and small phase noise (0.1 rad RMS)
+beam_in = add_beam_noise(beam_in, 0.05, 0.05);
+
+% optional: plot
+if (b_plot)
+    sub_figure = plot_intensity_with_1e2_contour(coords_4f_in, beam_in.I, 'input Beam',1,sub_figure);
+    show_1e2_radius(coords_4f_in,beam_in.I, gca)
+end
 
 [pinhole_plane, image_plane] = apply_spatial_filter_4f(beam_in.E_amp, coords_4f_in, beam.lambda_m, f1, f2, pinhole_d);
 
 % ---- image_plane ----
-% % optional: plot
-% plot_intensity_with_1e2_contour(image_plane.coords, image_plane.I, sprintf('image plane – filtered beam, M = %.2f', M_grid));
-% [wx_mm, wy_mm] = show_1e2_radius(image_plane.coords, image_plane.I, gca);
-% plot_slm_outline(slm, gca, 'EdgeColor','c','LineWidth',1.5);
+% optional: plot
+if b_plot
+    sub_figure = plot_intensity_with_1e2_contour(image_plane.coords, image_plane.I, sprintf('image plane ï¿½ filtered beam, M = %.2f', M_grid),1,sub_figure);
+    [wx_mm, wy_mm] = show_1e2_radius(image_plane.coords, image_plane.I, gca);
+    plot_slm_outline(slm, gca, 'EdgeColor','c','LineWidth',1.5);
+end
 
 [slm_plane] = crop_field_to_slm(image_plane.E, image_plane.coords, slm);
-% % optional: plot
-% plot_intensity_with_1e2_contour(slm_plane.coords, slm_plane.I, sprintf('SLM plane – filtered beam, M = %.2f', M_grid));
-% [wx_mm, wy_mm] = show_1e2_radius(slm_plane.coords, slm_plane.I, gca);
-% plot_slm_outline(slm, gca, 'EdgeColor','c','LineWidth',1.5);
+
+if b_plot
+    sub_figure = plot_intensity_with_1e2_contour(slm_plane.coords, slm_plane.I, sprintf('SLM plane ï¿½ filtered beam, M = %.2f', M_grid),1,sub_figure);
+    [wx_mm, wy_mm] = show_1e2_radius(slm_plane.coords, slm_plane.I, gca);
+    plot_slm_outline(slm, gca, 'EdgeColor','c','LineWidth',1.5);
+end
 
 %% imput beam
 beam_input_shape = slm_plane.E;
@@ -86,7 +127,10 @@ coords = slm_plane.coords;
 
 
 %% ================= Choose steering mode =================
-steer_mode = choose_steer_mode(theta_x_deg_user, theta_y_deg_user, Delta_x_mm_user, Delta_y_mm_user);
+[steer_mode, use_forked_] = choose_steer_mode(theta_x_deg_user, theta_y_deg_user, Delta_x_mm_user, Delta_y_mm_user);
+if ~(use_forked_ == 'none')
+    use_forked = false;
+end
         
 %% ================= Resolve to fcp =================
 switch steer_mode
@@ -153,8 +197,13 @@ if use_digital_lens
     lens_mask = make_lens_phase(coords, beam.lambda_m, f_focus);
 end
 
+% make circular mask
+mask = make_circular_mask(coords, beam, sqrt(beam.w0x_1e2_m.^2+beam.w0y_1e2_m.^2)/sqrt(2));
+if b_plot
+    sub_figure = plot_intensity_with_1e2_contour(coords, mask, sprintf('phase mask'),1,sub_figure);
+end
 % --- Total desired phase ---
-desired = vortex_mask + shift_mask + lens_mask;
+desired = (vortex_mask + shift_mask + lens_mask).* mask;
 
 %% --- Phase-only encoding (superposition kinoform) ---
 % We encode a reference (DC / zero-order) + the desired complex field into a phase-only pattern for the SLM.
@@ -168,26 +217,83 @@ phi = angle(U);
 % Wrap phase to [0, 2*pi)
 phi_wrapped = mod(phi, 2*pi);
 
+% figure('Name','SLM Phase (8-bit)'); 
+figure(3); 
+set(gcf, 'Name', 'SLM Phase (8-bit)');
+subplot(2,3,1)
+imagesc(vortex_mask)
+colormap(gca, gray);
+axis(gca, 'equal');
+subplot(2,3,2)
+imagesc(shift_mask)
+colormap(gca, gray);
+axis(gca, 'equal');
+subplot(2,3,3)
+imagesc(lens_mask)
+colormap(gca, gray);
+axis(gca, 'equal');
+subplot(2,3,4)
+imagesc(desired)
+colormap(gca, gray);
+axis(gca, 'equal');
+subplot(2,3,5)
+imagesc(phi)
+colormap(gca, gray);
+axis(gca, 'equal');
+subplot(2,3,6)
+imagesc(phi_wrapped)
+colormap(gca, gray);
+axis(gca, 'equal');
+
 % Alternative (simplest): display the desired phase directly
 % phi_wrapped = mod(desired, 2*pi);
 
-% Field immediately after SLM (input amplitude × SLM phase)
+% Field immediately after SLM (input amplitude ï¿½ SLM phase)
 E = beam_input_shape .* exp(1i * phi_wrapped);
 
 % Map wrapped phase to 8-bit grayscale using SLM calibration
 phase_gray = slm.c2pi2unit * (phi_wrapped / (2*pi));
-slm_img = uint8( min(slm.c2pi2unit, round(phase_gray)) );
+primary_mask_uint8 = uint8( min(slm.c2pi2unit, round(phase_gray)));
+combined_phase = uint16(primary_mask_uint8)+uint16(calib_mask);
+slm_img = uint8(mod(combined_phase, slm.c2pi2unit));
 
 
 % Show & save mask
-figure('Name','SLM Phase (8-bit)'); 
-imagesc(coords.x_mm, coords.y_mm, slm_img);
+% figure('Name','SLM Phase (8-bit)'); 
+figure(2)
+h_ax1 = subplot(2,3,1);
+imagesc(coords.x_mm, coords.y_mm, primary_mask_uint8);
 set(gca,'YDir','normal');    % so y increases upward
-axis image; colormap gray; colorbar;
+axis image; 
+colormap(h_ax1, gray); 
+colorbar;
 xlabel('x [mm]'); ylabel('y [mm]');
-title(sprintf('SLM Phase (wrapped, $0\\!\\ldots\\!2\\pi \\;\\rightarrow\\; 0\\!\\ldots\\!%d$ @ $\\lambda = %d\\,\\mathrm{nm}$)', ...
+title(sprintf('SLM Phase without clibration correction (8-bit, wrapped, $0\\!\\ldots\\!2\\pi \\;\\rightarrow\\; 0\\!\\ldots\\!%d$ @ $\\lambda = %d\\,\\mathrm{nm}$)', ...
     slm.c2pi2unit, round(beam.lambda_m*1e9)), 'Interpreter','latex');
 caxis([0 slm.c2pi2unit]);
+
+h_ax2 = subplot(2,3,4);
+imagesc(coords.x_mm, coords.y_mm, slm_img);
+set(gca,'YDir','normal');    % so y increases upward
+axis image; 
+colormap(h_ax2, gray);
+colorbar;
+xlabel('x [mm]'); ylabel('y [mm]');
+title(sprintf('SLM Phase with calibration correction (8-bit, wrapped, $0\\!\\ldots\\!2\\pi \\;\\rightarrow\\; 0\\!\\ldots\\!%d$ @ $\\lambda = %d\\,\\mathrm{nm}$)', ...
+    slm.c2pi2unit, round(beam.lambda_m*1e9)), 'Interpreter','latex');
+caxis([0 slm.c2pi2unit]);
+
+% --- LINK AXES ---
+% This links the X and Y limits of the two axes (h_ax1 and h_ax2).
+% 'xy' means link both the X and Y axes.
+linkaxes([h_ax1, h_ax2], 'xy');
+
+% OPTIONAL: Set a common set of limits if they haven't been automatically
+% synchronized yet. For image data on the same grid, this is usually unnecessary,
+% but it's a good fail-safe.
+% xlim(h_ax1, [min_x, max_x]); 
+% ylim(h_ax1, [min_y, max_y]);
+
 
 % return
 if save_mask_png, imwrite(slm_img, mask_filename); end
@@ -230,8 +336,9 @@ if do_fft_farfield
             1e3*LFx, 1e3*LFy, round(1e3*f));
     
     % ----- Plot with correct axes -----
-    figure('Name','Sim: Fourier-plane (after lens)');
-
+%     figure('Name','Sim: Fourier-plane (after lens)');
+    figure(2)
+    subplot(2,3,[2:3 5:6]);
     if use_log_view
         % safe log10: avoid -Inf by adding eps
         Ilog = log10(I_FT + eps*0);
@@ -250,7 +357,7 @@ if do_fft_farfield
 
     set(gca,'YDir','normal'); axis image; colormap hot; colorbar;
     xlabel('x_F [mm]'); ylabel('y_F [mm]');
-    title(sprintf('Simulated far-field (log scale = %s, Fourier plane, donut in +1 order if forked)', ternary(use_log_view, 'true', 'false')), ...
+    title(sprintf('Sim: Fourier-plane (after lens), Simulated far-field (log scale = %s, Fourier plane, donut in +1 order if forked)', ternary(use_log_view, 'true', 'false')), ...
       'Interpreter','latex');
 
     if save_sim_fft_png, imwrite(uint8(255*mat2gray(I_FT)), fft_filename); end

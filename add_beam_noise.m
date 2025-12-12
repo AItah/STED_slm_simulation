@@ -47,7 +47,14 @@ function beam_noisy = add_beam_noise(beam_in, rel_amp_sigma, phase_sigma_rad)
 
     % ---- Amplitude noise (multiplicative Gaussian) ----
     if rel_amp_sigma > 0
-        noiseA = rel_amp_sigma * randn(size(A));
+        noise = randn(size(A));
+        max_abs_val = max(abs(noise(:)));
+        if max_abs_val > 0
+            noiseA = rel_amp_sigma * (noise / max_abs_val);
+        else
+            noiseA = zeros(size(A)); % Failsafe
+        end
+
         A_noisy = A .* (1 + noiseA);
         % Avoid negative amplitudes:
         A_noisy(A_noisy < 0) = 0;
@@ -57,7 +64,13 @@ function beam_noisy = add_beam_noise(beam_in, rel_amp_sigma, phase_sigma_rad)
 
     % ---- Phase noise (additive Gaussian) ----
     if phase_sigma_rad > 0
-        noisePhi = phase_sigma_rad * randn(size(phi));
+        noise = randn(size(A));
+        max_abs_val = max(abs(noise(:)));
+        if max_abs_val > 0
+            noisePhi = phase_sigma_rad * (noise / max_abs_val);
+        else
+            noisePhi = zeros(size(A)); % Failsafe
+        end
         phi_noisy = phi + noisePhi;
     else
         phi_noisy = phi;

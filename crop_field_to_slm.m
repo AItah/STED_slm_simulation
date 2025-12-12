@@ -86,8 +86,7 @@ function slm_plane = crop_field_to_slm(E_in, coords_in, slm)
     % ---- SLM coordinates: canonical grid ----
     % This will be identical to:
     %   make_coordinates(slm.Nx, slm.Ny, slm.px_side_m, slm.py_side_m, true)
-    slm_plane.coords = make_coordinates( ...
-        slm.Nx, slm.Ny, slm.px_side_m, slm.py_side_m, false);
+    slm_plane.coords = make_coordinates(slm.Nx, slm.Ny, slm.px_side_m, slm.py_side_m, true);
 
     % ---- (Optional) store where this patch sits in the parent plane ----
     slm_plane.center_in_parent_mm = [ x_mm(ix_center), y_mm(iy_center) ];
