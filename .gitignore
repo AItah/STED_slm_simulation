@@ -223,3 +223,6 @@ __marimo__/
 sim_farfield_fft.bmp
 .gitignore
 .gitignore
+Vendor/LaTex/basic-miktex-24.1-x64.exe
+.gitignore
+Vendor/LaTex/strawberry-perl-5.42.0.1-64bit.msi
