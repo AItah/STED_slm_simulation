@@ -1,0 +1,363 @@
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{graphicx}
+
+\definecolor{darkGreen}{rgb}{0, 0.5, 0}
+
+\begin{document}
+
+\section{\textcolor{darkGreen}{System image - mainly a test the LaTeX :)}}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{C:/WC/SelfEmployee_wc/2025/STED with Nir/images/Sted_with_LCOS_SLM.png}
+    \caption{STED system. The SLM part was simulated here.}
+    \label{fig:short_tag_for_reference}
+\end{figure}
+
+\section{Overview}
+
+This document describes, in mathematical and physical terms, the simulation performed by the \texttt{donut\_simulator} code. The pipeline is:
+
+\begin{enumerate}
+    \item Construct a collimated Gaussian input beam on the entrance plane of a \(4f\) system.
+    \item Propagate through a \(4f\) telescope with a pinhole at the common focal plane (spatial filter and, optionally, beam expander).
+    \item Crop the resulting field to match the physical size and pixel sampling of a spatial light modulator (SLM).
+    \item Apply a phase-only hologram on the SLM, consisting of a vortex phase, a steering (tilt) phase, and optionally a digital lens phase, encoded via a superposition kinoform.
+    \item Propagate the modulated field to the Fourier plane of a lens and observe the intensity pattern (donut focus), and optionally perform Fresnel propagation to another plane.
+\end{enumerate}
+
+\section{Coordinate System and Sampling}
+
+The SLM is modeled as a 2D discrete grid with
+\[
+N_x \times N_y \quad \text{pixels},
+\]
+and pixel pitches
+\[
+p_x,\, p_y \quad [\mathrm{m}].
+\]
+
+Continuous transverse coordinates on any plane are denoted
+\[
+x = n_x p_x,\quad y = n_y p_y,
+\]
+where \(n_x, n_y\) are integer indices chosen so that the grid is centered around the optical axis (i.e.\ \(x = 0\), \(y = 0\) lie at or near the center of the array).
+
+The wavelength is
+\[
+\lambda \quad [\mathrm{m}],
+\]
+taken from the beam configuration (e.g.\ \(775\ \mathrm{nm}\)).
+
+\section{Input Gaussian Beam}
+
+On the entrance plane of the \(4f\) system (Plane A), a collimated Gaussian beam is defined. The ideal (noise-free) complex field is taken to have the form
+\begin{equation}
+    E_{\text{in}}(x,y;z) = p\,
+    \exp\!\left[
+        -\frac{(x - x_0)^2}{w_x(z)^2}
+        -\frac{(y - y_0)^2}{w_y(z)^2}
+    \right],
+\end{equation}
+where
+\begin{itemize}
+    \item \(p\) is an overall amplitude scaling (related to normalized power),
+    \item \(x_0, y_0\) are transverse offsets of the beam center,
+    \item \(w_x(z)\), \(w_y(z)\) are the \(1/e^2\) intensity radii in \(x\) and \(y\) at longitudinal position \(z\),
+    \item the beam is assumed collimated at the plane of interest (often \(z \approx 0\)).
+\end{itemize}
+
+Using an \(M^2\) beam-quality factor, the Rayleigh ranges in \(x\) and \(y\) are modeled as
+\begin{equation}
+    z_{R,x} = \frac{\pi w_{0x}^2}{M^2 \lambda}, 
+    \qquad
+    z_{R,y} = \frac{\pi w_{0y}^2}{M^2 \lambda},
+\end{equation}
+where \(w_{0x}, w_{0y}\) are the waist radii (at \(z = z_0\)), and the radii at position \(z\) are
+\begin{equation}
+    w_x(z) = w_{0x}\sqrt{1 + \left(\frac{z - z_0}{z_{R,x}}\right)^2},
+    \qquad
+    w_y(z) = w_{0y}\sqrt{1 + \left(\frac{z - z_0}{z_{R,y}}\right)^2}.
+\end{equation}
+
+For the simulation, a specific plane is chosen (often at or near the waist), so that \(w_x\) and \(w_y\) are constant over the transverse grid.
+
+\subsection{Optional Noise Model}
+
+To emulate experimental imperfections, the input beam can be perturbed by amplitude and phase noise. Starting from a complex field
+\begin{equation}
+    E_{\text{clean}}(x,y) = A(x,y)e^{i\phi(x,y)},
+\end{equation}
+the noisy field is constructed as
+\begin{equation}
+    E_{\text{noisy}}(x,y)
+    = A(x,y)\bigl[1 + \delta A(x,y)\bigr]\;
+      \exp\bigl(i[\phi(x,y) + \delta\phi(x,y)]\bigr),
+\end{equation}
+where
+\begin{align}
+    \delta A(x,y) &\sim \mathcal{N}\!\left(0,\,\sigma_A^2\right)
+    && \text{(relative amplitude noise)}, \\
+    \delta\phi(x,y) &\sim \mathcal{N}\!\left(0,\,\sigma_\phi^2\right)
+    && \text{(phase noise in radians)}.
+\end{align}
+Here \(\sigma_A\) is a small fraction (e.g.\ \(0.01\) for \(1\%\) RMS amplitude noise), and \(\sigma_\phi\) is a small phase perturbation (e.g.\ \(0.01\ \mathrm{rad}\)).
+
+The corresponding intensity is then
+\begin{equation}
+    I_{\text{in}}(x,y) = \left|E_{\text{noisy}}(x,y)\right|^2.
+\end{equation}
+
+\section{{4f} Spatial Filter and Beam Expander}
+
+The beam is propagated through a \(4f\) system consisting of two lenses of focal lengths \(f_1\) and \(f_2\), separated by \(f_1 + f_2\), with a circular pinhole placed at the common focal plane (Plane B). The input plane (Plane A) is at the front focal plane of lens 1, and the output plane (Plane C) is at the back focal plane of lens 2.
+
+\subsection{Fourier Plane of Lens 1 (Plane B)}
+
+Let the input field on Plane A be \(E_{\text{in}}(x,y)\). The paraxial Fourier relation for a thin lens of focal length \(f_1\) gives, at Plane B:
+\begin{equation}
+    E_B(X_B, Y_B) \propto 
+    \mathcal{F}\{E_{\text{in}}(x,y)\}\big|_{f_x,f_y},
+\end{equation}
+where \(\mathcal{F}\{\cdot\}\) denotes a 2D Fourier transform with spatial-frequency coordinates \((f_x,f_y)\), and the physical coordinates in the focal plane are
+\begin{equation}
+    X_B = \lambda f_1 f_x,
+    \qquad
+    Y_B = \lambda f_1 f_y.
+\end{equation}
+
+\subsection{Pinhole Spatial Filter}
+
+In the common focal plane (Plane B), a circular pinhole of diameter \(d_{\text{ph}}\) is applied:
+\begin{equation}
+    P(X_B,Y_B) =
+    \begin{cases}
+        1, & \sqrt{X_B^2 + Y_B^2} \leq \dfrac{d_{\text{ph}}}{2}, \\[6pt]
+        0, & \text{otherwise}.
+    \end{cases}
+\end{equation}
+The field after the pinhole is
+\begin{equation}
+    E_B^{(\text{ph})}(X_B, Y_B) = E_B(X_B, Y_B)\,P(X_B, Y_B).
+\end{equation}
+This acts as a low-pass spatial filter, transmitting primarily the low spatial-frequency components of the beam and suppressing high-frequency noise and aberrations.
+
+\subsection{Image Plane of Lens 2 (Plane C)}
+
+Lens 2, with focal length \(f_2\), forms an image of the input plane. In the ideal paraxial \(4f\) configuration, this corresponds to an inverse Fourier transform relationship:
+\begin{equation}
+    E_C(x_C, y_C) \propto \mathcal{F}^{-1}\left\{E_B^{(\text{ph})}(X_B, Y_B)\right\}.
+\end{equation}
+
+The \(4f\) telescope provides a geometric magnification
+\begin{equation}
+    M = \frac{f_2}{f_1},
+\end{equation}
+so that, ideally,
+\begin{equation}
+    x_C = M x,\qquad y_C = M y.
+\end{equation}
+The sampling pitch on Plane C in the simulation is thus scaled as
+\begin{equation}
+    p_{x,C} = M\,p_x,\qquad p_{y,C} = M\,p_y.
+\end{equation}
+
+The intensity on the image plane is
+\begin{equation}
+    I_C(x_C, y_C) = \left|E_C(x_C, y_C)\right|^2.
+\end{equation}
+
+\section{Projection onto the SLM}
+
+The SLM has a finite physical size
+\[
+L_x = N_x p_x,\qquad L_y = N_y p_y,
+\]
+and we wish to illuminate it with the filtered beam from Plane C. Numerically, this is performed by selecting a central patch of \(E_C(x_C,y_C)\) that matches the SLM size. Let \(W(x_C,y_C)\) be a window that extracts this central region:
+\begin{equation}
+    W(x_C,y_C) =
+    \begin{cases}
+        1, & (x_C,y_C)\ \text{inside SLM region}, \\
+        0, & \text{otherwise}.
+    \end{cases}
+\end{equation}
+The field incident on the SLM is then
+\begin{equation}
+    E_{\text{SLM}}(x,y) = E_C(x,y)\,W(x,y),
+\end{equation}
+where \((x,y)\) are now the SLM coordinates with sampling \(p_x, p_y\) and size \(N_x \times N_y\).
+
+The corresponding intensity at the SLM plane is
+\begin{equation}
+    I_{\text{SLM}}(x,y) = \left|E_{\text{SLM}}(x,y)\right|^2.
+\end{equation}
+
+\section{Vortex and Steering Phase Masks}
+
+On the SLM, we apply a phase-only mask that consists of three contributions:
+\begin{equation}
+    \phi_{\text{des}}(x,y) =
+        \phi_{\text{vortex}}(x,y)
+        + \phi_{\text{shift}}(x,y)
+        + \phi_{\text{lens}}(x,y),
+\end{equation}
+with each term defined as follows.
+
+\subsection{Vortex Phase}
+
+The vortex (helical) phase encodes a topological charge \(\ell \in \mathbb{Z}\) (typically \(\ell \geq 1\)):
+\begin{equation}
+    \phi_{\text{vortex}}(x,y) = \ell\,\theta(x,y),
+\end{equation}
+where
+\begin{equation}
+    \theta(x,y) = \operatorname{atan2}(y,x)
+\end{equation}
+is the azimuthal angle in the transverse plane. This phase produces a doughnut-shaped intensity distribution near the focus of a lens, with a central phase singularity.
+
+\subsection{Steering (Tilt) Phase}
+
+To tilt the output beam by small angles \(\theta_x\) and \(\theta_y\) with respect to the optical axis, a linear phase ramp is applied. In discrete (pixel-based) form, the mask uses carrier spatial frequencies \(f_{\mathrm{cp},x}\) and \(f_{\mathrm{cp},y}\) (in cycles per pixel):
+\begin{equation}
+    \phi_{\text{shift}}(n_x,n_y) = 2\pi\left(f_{\mathrm{cp},x} n_x + f_{\mathrm{cp},y} n_y\right),
+\end{equation}
+where \(n_x, n_y\) are the pixel indices.
+
+Under a small-angle approximation, the relationship between the steering angles and carrier frequencies is
+\begin{equation}
+    \theta_x \approx \frac{\lambda}{p_x}\,f_{\mathrm{cp},x},
+    \qquad
+    \theta_y \approx \frac{\lambda}{p_y}\,f_{\mathrm{cp},y}.
+\end{equation}
+
+If the user specifies a desired shift \(\Delta_x\) and \(\Delta_y\) in the Fourier plane (the focal plane of a lens with focal length \(f\)), the angles are obtained via
+\begin{equation}
+    \theta_x = \arctan\left(\frac{\Delta_x}{f}\right),
+    \qquad
+    \theta_y = \arctan\left(\frac{\Delta_y}{f}\right),
+\end{equation}
+and then converted to carrier frequencies as
+\begin{equation}
+    f_{\mathrm{cp},x} = \frac{\theta_x p_x}{\lambda},
+    \qquad
+    f_{\mathrm{cp},y} = \frac{\theta_y p_y}{\lambda}.
+\end{equation}
+
+The code further enforces a Nyquist limit
+\begin{equation}
+    \sqrt{f_{\mathrm{cp},x}^2 + f_{\mathrm{cp},y}^2} \leq \frac{1}{2},
+\end{equation}
+ensuring that the phase ramp is not undersampled by the pixel grid.
+
+\subsection{Optional Digital Lens Phase}
+
+An additional quadratic phase can mimic a focusing lens directly on the SLM:
+\begin{equation}
+    \phi_{\text{lens}}(x,y) =
+    -\frac{\pi}{\lambda f_{\text{focus}}}
+    \left(x^2 + y^2\right),
+\end{equation}
+where \(f_{\text{focus}}\) is the effective focal length. This term is included only if requested; otherwise \(\phi_{\text{lens}} = 0\).
+
+\section{Phase-Only Hologram Encoding (Superposition Kinoform)}
+
+Since the SLM is phase-only, the desired complex modulation must be encoded via the phase of a single complex field. A standard superposition method is used:
+\begin{equation}
+    U(x,y) = d_c + \gamma\,e^{i\phi_{\text{des}}(x,y)},
+\end{equation}
+where
+\begin{itemize}
+    \item \(d_c\) is a real DC bias (reference wave amplitude),
+    \item \(\gamma\) is a real weighting factor controlling the strength of the desired pattern.
+\end{itemize}
+
+The phase pattern displayed on the SLM is then
+\begin{equation}
+    \phi_{\text{SLM}}(x,y) =
+    \arg\left(U(x,y)\right),
+\end{equation}
+and is wrapped into the range \([0,2\pi)\):
+\begin{equation}
+    \phi_{\text{wrapped}}(x,y) =
+    \phi_{\text{SLM}}(x,y) \bmod 2\pi.
+\end{equation}
+
+The field immediately after the SLM is
+\begin{equation}
+    E_{\text{out}}(x,y)
+    = E_{\text{SLM}}(x,y)\,\exp\bigl(i\phi_{\text{wrapped}}(x,y)\bigr).
+\end{equation}
+
+\subsection{Quantization to SLM Gray Levels}
+
+The physical SLM is calibrated so that a certain number of grayscale levels corresponds to a \(2\pi\) phase shift. If the SLM supports a maximum phase index \(C_{2\pi}\) for a \(2\pi\) phase (e.g.\ \(C_{2\pi} = 204\)), then the gray value assigned to each pixel is
+\begin{equation}
+    g(x,y) = \mathrm{round}\!\left(
+        C_{2\pi}\,\frac{\phi_{\text{wrapped}}(x,y)}{2\pi}
+    \right),
+\end{equation}
+and is clipped to the valid range \([0, C_{2\pi}]\). This discrete grayscale pattern is what is actually sent to the SLM hardware.
+
+\section{Reconstruction in the Fourier Plane After the SLM}
+
+To simulate the donut focus formed by a lens of focal length \(f\) placed after the SLM, the field \(E_{\text{out}}(x,y)\) is propagated to its focal plane (Plane F). In the paraxial approximation, the intensity distribution at Plane F is proportional to the modulus squared of the Fourier transform of \(E_{\text{out}}\):
+\begin{equation}
+    E_F(X_F,Y_F) \propto
+    \mathcal{F}\left\{E_{\text{out}}(x,y)\right\},
+\end{equation}
+with physical coordinates
+\begin{equation}
+    X_F = \lambda f f_x,
+    \qquad
+    Y_F = \lambda f f_y,
+\end{equation}
+where \((f_x, f_y)\) are the spatial frequencies associated with the discrete sampling \(p_x, p_y\).
+
+The simulated far-field intensity is
+\begin{equation}
+    I_F(X_F,Y_F) = \frac{\left|E_F(X_F,Y_F)\right|^2}{I_{\max}},
+\end{equation}
+where \(I_{\max}\) is the maximum value of \(\left|E_F\right|^2\), used for normalization.
+
+The predicted position of the first-order (steered) vortex spot in the Fourier plane is
+\begin{align}
+    \Delta X_F &= f\,\lambda\,\frac{f_{\mathrm{cp},x}}{p_x}, \\
+    \Delta Y_F &= f\,\lambda\,\frac{f_{\mathrm{cp},y}}{p_y},
+\end{align}
+which can be compared to the numerically obtained intensity maximum in the far field.
+
+\section{Optional Fresnel Propagation}
+
+In addition to the focal-plane (Fourier) propagation, the code can perform Fresnel (near-field) propagation using the angular spectrum method. Starting from an initial field \(E_0(x,y)\) on some plane, and defining spatial frequency coordinates \((f_x,f_y)\), the propagated field after a distance \(z\) is
+\begin{equation}
+    E_z(x,y) =
+    \mathcal{F}^{-1}
+    \left\{
+        \mathcal{F}\{E_0(x,y)\}\;
+        H(f_x,f_y; z)
+    \right\},
+\end{equation}
+where the transfer function is
+\begin{equation}
+    H(f_x,f_y; z) =
+    \exp\left[
+        i k z \sqrt{1 - (\lambda f_x)^2 - (\lambda f_y)^2}
+    \right],
+\end{equation}
+and
+\begin{equation}
+    k = \frac{2\pi}{\lambda}
+\end{equation}
+is the wavenumber. The intensity at distance \(z\) is then
+\begin{equation}
+    I_z(x,y) = \frac{\left|E_z(x,y)\right|^2}{\max\left|E_z\right|^2}.
+\end{equation}
+
+This provides a way to examine the field evolution at arbitrary propagation distances, not only at focal planes.
+
+\end{document}

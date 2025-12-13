@@ -21,10 +21,10 @@ sub_figure.i = 0;
 use_log_view = true;       % toggle log or linear view
 
 %% ================= Steering user inputs =================
-theta_x_deg_user = -0.5;   % [deg]
+theta_x_deg_user = -0.0;   % [deg]
 theta_y_deg_user =  0.0;  % [deg]
 
-Delta_x_mm_user  =  0.0;   % [mm]
+Delta_x_mm_user  =  -0.4;   % [mm]
 Delta_y_mm_user  =  0.0;  % [mm]
 
 % Vortex control
@@ -65,8 +65,8 @@ beam_R.center_x_m= slm.Nx*slm.px_side_m/4;
 
 %% === input beam + Spatial filter + expander parameters ===
 % 4f optics
-f1        = 100e-3;
-f2        = 250e-3;
+f1        = 250e-3;
+f2        = 500e-3;
 M_4f      = f2 / f1;
 pinhole_d = 25e-6;
 
