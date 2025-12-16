@@ -57,13 +57,16 @@ function [sub_figure] = plot_intensity_with_1e2_contour(coords, I, fig_title, fi
     end
     
     imagesc(x_mm, y_mm, Inorm);
+    axis equal;
     axis image;
     set(gca, 'YDir', 'normal');
     colorbar;
+    colormap hot;
     xlabel('x [mm]');
     ylabel('y [mm]');
     if ~isempty(fig_title)
-        title(fig_title);
+        title(fig_title, 'Interpreter', 'latex', 'FontSize', 16);
+%         title(fig_title);
     end
     caxis([0 1]);
 
