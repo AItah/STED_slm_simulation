@@ -5,7 +5,7 @@ Step-by-step equations that mirror the script and helpers. Symbols: $x,y$ in met
 ## 1) Coordinates and Input Beam
 - Grid (from `make_coordinates`):
   $$x_i = \big(i - \tfrac{N_x-1}{2}\big)\,p_x,\qquad y_j = \big(j - \tfrac{N_y-1}{2}\big)\,p_y$$
-- Gaussian amplitude (1/e$^2$ radii $w_{0x}, w_{0y}$):
+- Gaussian amplitude ($1/e^2$ radii $w_{0x}, w_{0y}$):
   $$E_{\text{in}}(X,Y) = \exp\!\left(-\frac{X^2}{w_{0x}^2} - \frac{Y^2}{w_{0y}^2}\right)$$
 
 ## 2) 4f Spatial Filter (`apply_spatial_filter_4f`)
@@ -29,7 +29,7 @@ Step-by-step equations that mirror the script and helpers. Symbols: $x,y$ in met
 
 ## 4) Phase Building Blocks
 - Vortex:
-  $$\phi_{\text{vortex}} = \ell\,\operatorname{atan2}(Y, X)$$
+  $$\phi_{\text{vortex}} = \ell\,\text{atan2}(Y, X)$$
 - Steering grating (pixel indices $\xi,\eta$):
   $$\phi_{\text{shift}} = 2\pi\big(f_{cp,x}\,\xi + f_{cp,y}\,\eta\big)$$
 - Digital lens (optional):
@@ -41,17 +41,17 @@ Step-by-step equations that mirror the script and helpers. Symbols: $x,y$ in met
   $$\phi_{\text{des}} = M_{\text{circ}}\,\phi_{\text{vortex}} + \phi_{\text{shift}} + \phi_{\text{lens}}$$
 - Superposition kinoform:
   $$U = d_c + \gamma\,e^{i\phi_{\text{des}}}$$
-- Display phase: $\phi = \operatorname{angle}(U)$; optional noise: $\phi \mathrel{+}= \mathcal{N}(0,\sigma^2)$.
-- Wrap: $\phi_{\text{wrap}} = \operatorname{mod}(\phi, 2\pi)$.
+- Display phase: $\phi = \text{angle}(U)$; optional noise: $\phi \mathrel{+}= \mathcal{N}(0,\sigma^2)$.
+- Wrap: $\phi_{\text{wrap}} = \text{mod}(\phi, 2\pi)$.
 - SLM mapping:
-  $$\text{gray} = \operatorname{clip}\!\left( \operatorname{round}\!\left( \frac{\phi_{\text{wrap}}}{2\pi} \cdot c2pi2unit \right),\ 0,\ c2pi2unit \right)$$
+  $$\text{gray} = \text{clip}\!\left( \text{round}\!\left( \frac{\phi_{\text{wrap}}}{2\pi} \cdot c2pi2unit \right),\ 0,\ c2pi2unit \right)$$
 - Field after SLM (pre-polarization):
   $$E = |E_{\text{beam}}|\,e^{i\phi_{\text{wrap}}}$$
 
 ## 6) Polarization Waveplate (`apply_waveplate`)
 - Rotation:
   $$R(\alpha) = \begin{bmatrix}\cos\alpha & -\sin\alpha\\ \sin\alpha & \cos\alpha\end{bmatrix}$$
-- Waveplate (fast axis $x'$): $J_0 = \operatorname{diag}(1, e^{i\delta})$.
+- Waveplate (fast axis $x'$): $J_0 = \text{diag}(1, e^{i\delta})$.
 - Jones matrix in lab frame:
   $$J = R^T\! J_0\, R$$
 - Output field:
@@ -59,7 +59,7 @@ Step-by-step equations that mirror the script and helpers. Symbols: $x,y$ in met
 (Quarter-wave when $\delta = \pi/2$, $\alpha = 45^\circ$.)
 
 ## 7) Far-Field FFT (Fourier Plane)
-- Pad by factor $P$; center $E$ in zero array, FFT: $E_{\text{FF}} = \operatorname{FFT2}_{\text{shifted}}(E_{\text{pad}})$.
+- Pad by factor $P$; center $E$ in zero array, FFT: $E_{\text{FF}} = \text{FFT2}_{\text{shifted}}(E_{\text{pad}})$.
 - Intensity: $I_{\text{FF}} = |E_{\text{FF}}|^2$, normalized to max $=1$.
 - Physical sampling:
   $$\Delta x_F^{\text{native}} = \frac{f\,\lambda}{N_x p_x},\qquad \Delta x_F = \frac{\Delta x_F^{\text{native}}}{P}$$
