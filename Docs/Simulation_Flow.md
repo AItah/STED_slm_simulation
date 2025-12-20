@@ -19,56 +19,55 @@ flowchart TD
         A1 --> A2[Load beam params JSON<br/>load_gaussian_beam_params]
     end
 
-    %% Input beam preparation (grid + 4f filter + crop)
-    subgraph BeamPrep[Input Beam Prep (4f + crop)]
+    %% Input beam preparation
+    subgraph BeamPrep[Input Beam Prep]
         B1[Build expanded coordinates<br/>make_coordinates] --> B2[Generate input beam amplitude<br/>make_gaussian_input_beam]
-        B2 --> B3[Apply 4f spatial filter (default)<br/>apply_spatial_filter_4f]
+        B2 --> B3[Apply 4f spatial filter<br/>apply_spatial_filter_4f]
         B3 --> B4[Crop field to SLM grid<br/>crop_field_to_slm]
     end
 
     A2 --> B1
-    B4 --> C0[Use cropped field as SLM input amplitude]
+    B4 --> C0[Cropped field = SLM input amplitude]
 
-    %% Steering (user inputs -> theta -> fcp -> clamp)
-    subgraph Steering[Steering (user inputs)]
-        C0 --> C1[Choose steering mode<br/>choose_steer_mode]
-        C1 -->|shift| C2[Convert shift to angles<br/>theta_from_shift]
-        C1 -->|angle| C3[Use user angles]
-        C2 --> C4[Convert angles to carrier (cycles/pixel)<br/>fcp_from_theta]
+    %% Steering
+    subgraph Steering[Steering]
+        C0 --> C1{Choose steering mode}
+        C1 -- shift --> C2[Convert shift to angles<br/>theta_from_shift]
+        C1 -- angle --> C3[Use user angles]
+        C2 --> C4[Convert angles to carrier<br/>fcp_from_theta]
         C3 --> C4
         C4 --> C5[Clamp to Nyquist<br/>clamp_fcp_nyquist]
     end
 
-    %% Mask construction (vortex + optional forked shift + optional digital lens + circular mask)
+    %% Mask construction
     subgraph Mask[Mask Construction]
-        C5 --> D1[Vortex phase<br/>make_vortex_phase]
-        C5 --> D2{Forked mode enabled?}
-        D2 -->|yes| D3[Shift phase<br/>make_shift_phase]
-        D2 -->|no| D4[No shift term]
-        C5 --> D5{Digital lens enabled?}
-        D5 -->|yes| D6[Lens phase<br/>make_lens_phase]
-        D5 -->|no| D7[No lens term]
-        C5 --> D8[Circular aperture mask<br/>make_circular_mask]
-        D1 --> D9[Desired phase<br/>vortex * mask + shift + lens]
-        D3 --> D9
-        D4 --> D9
-        D6 --> D9
-        D7 --> D9
-        D8 --> D9
+        C5 --> D_Logic{Feature Check}
+        D_Logic --> D1[Vortex phase<br/>make_vortex_phase]
+        D_Logic --> D2{Forked mode?}
+        D2 -- yes --> D3[Shift phase<br/>make_shift_phase]
+        D2 -- no --> D4[No shift term]
+        
+        D_Logic --> D5{Digital lens?}
+        D5 -- yes --> D6[Lens phase<br/>make_lens_phase]
+        D5 -- no --> D7[No lens term]
+        
+        D_Logic --> D8[Circular aperture mask<br/>make_circular_mask]
+
+        D1 & D3 & D4 & D6 & D7 & D8 --> D9[Sum Desired Phase<br/>vortex*mask + shift + lens]
     end
 
-    %% Phase-only encoding + saving
+    %% Phase-only encoding
     subgraph Encoding[Phase-Only Encoding + Save]
-        D9 --> E1[Superposition kinoform<br/>U = dc_bias + gamma * exp(i*desired)]
-        E1 --> E2[Phase-only hologram<br/>phi = angle(U)]
+        D9 --> E1[Superposition kinoform<br/>U = dc + gamma * exp]
+        E1 --> E2[Phase-only hologram<br/>phi = angle_U]
         E2 --> E3[Optional phase noise]
-        E3 --> E4[Wrap phase to [0, 2pi)<br/>phi_wrapped = mod(phi, 2pi)]
-        E4 --> E5[Field after SLM<br/>E = Ein * exp(i*phi_wrapped)]
-        E4 --> E6[Quantize phase to SLM grayscale]
-        E6 --> E7[Save mask BMP<br/>imwrite slm_vortex_*.bmp]
+        E3 --> E4[Wrap phase to 0, 2pi]
+        E4 --> E5[Field after SLM<br/>E = Ein * exp]
+        E4 --> E6[Quantize to SLM grayscale]
+        E6 --> E7[Save mask BMP]
     end
 
-    %% Polarization model (used in far-field intensity)
+    %% Polarization
     subgraph Pol[Polarization]
         E5 --> F1[Assume Ex = E, Ey = 0]
         F1 --> F2[Apply QWP<br/>apply_waveplate]
@@ -77,10 +76,11 @@ flowchart TD
     %% Simulation
     subgraph Sim[Simulation Outputs]
         F2 --> G0{Simulate?}
-        G0 -->|Far-field FFT| G1[Zero-pad and FFT2]
-        G1 --> G2[Intensity from Ex/Ey FFTs]
+        G0 -- Far-field --> G1[Zero-pad and FFT2]
+        G1 --> G2[Intensity calculation]
         G2 --> G3[Save sim_farfield_fft.bmp]
-        G0 -->|Fresnel (optional)| H1[Angular spectrum propagation (uses E)]
+        
+        G0 -- Fresnel --> H1[Angular spectrum propagation]
         H1 --> H2[Save sim_fresnel_z.bmp]
     end
 ```
