@@ -5,7 +5,7 @@ High-level script to build SLM phase masks (vortex, forked/steered, digital lens
 
 ## Physics & Mathematics
 Combines vortex phase $\ell\theta$, linear grating phase for steering, and quadratic Fresnel lens phase. Phase-only hologram formed from complex field
-$U=d_c+\gamma e^{i\phi_{combined}},\qquad\phi=\operatorname{angle}(U).$
+$U=d_c+\gamma e^{i\phi_{combined}},\qquad\phi=\text{angle}(U).$
 Far-field of SLM pattern computed via padded FFT; mapping from FFT bins to focal-plane distances uses $x_F=\lambda f f_x$.
 
 ## Logical Flow
