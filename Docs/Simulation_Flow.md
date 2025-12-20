@@ -1,30 +1,48 @@
-# Simulation Flow for `donut_simulator.m`
+# Donut Simulator: Simulation Flow
 
-High-level flow following the script and its helpers. Diagram is plain-text Mermaid to maximize compatibility across GitHub and IDE previews; equations stay below in LaTeX.
+This document outlines the execution logic for `donut_simulator.m`. The flowchart below describes the data transformation from input parameters to the final simulated field.
+
+## Process Flowchart
 
 ```mermaid
 flowchart TD
-    A[Load inputs] --> B[Build coordinates]
-    B --> C[Generate input beam]
-    C --> D{Apply 4f spatial filter?}
-    D -- yes --> D1[FFT -> pinhole mask -> iFFT -> crop]
-    D -- no --> E
-    D1 --> E[SLM-plane field]
-    E --> F{Steer mode?}
-    F --> G[Steer by angle or shift]
-    G --> H[Compute f_cp and clamp]
-    H --> I[Add phase terms (vortex, shift, lens)]
-    I --> J[Optional circular mask]
-    J --> K[Compose desired phase]
-    K --> L[Kinoform superposition and wrap]
-    L --> M[Map to SLM units]
-    M --> N[Save mask BMP]
-    M --> O[Field after SLM]
-    O --> P[Polarization (QWP)]
-    P --> Q{Simulate?}
-    Q -- Far-field FFT --> R[Pad -> FFT2 -> I_FF]
+    %% Define Nodes
+    A[Load Inputs:<br/>SLM & Beam JSONs] --> B[Build Coordinates<br/>make_coordinates]
+    B --> C[Generate Input Beam<br/>make_gaussian_input_beam]
+    
+    C --> D{4f Spatial Filter?}
+    D -- Yes --> D1[FFT to Pinhole Mask]
+    D1 --> D2[iFFT & Scaling]
+    D2 --> E[SLM-Plane Field]
+    D -- No --> E
+
+    E --> F{Steer Mode}
+    F -- Shift --> G1[Calculate theta via atan]
+    F -- Angle --> G2[Use theta from inputs]
+    
+    G1 & G2 --> H[Calculate Carrier Frequency<br/>f_cp = theta * p / lambda]
+    H --> I[Generate Phase Terms]
+    
+    subgraph Phase_Construction [Phase Component Summation]
+        I1[Vortex Phase]
+        I2[Shift Phase]
+        I3[Lens Phase]
+    end
+
+    I1 & I2 & I3 --> K[Desired Phase: phi_des]
+    K --> L[Kinoform Superposition<br/>U = d_c + gamma * exp]
+    
+    L --> M[Map to SLM Units<br/>Quantize to Gray Levels]
+    M --> N[Save Mask BMP]
+    M --> O[Propagate Field after SLM]
+    
+    O --> P[Apply Polarization<br/>Waveplate/QWP]
+    
+    P --> Q{Simulation Type}
+    Q -- Far-field --> R[Pad & FFT2]
     R --> S[Save sim_farfield_fft.bmp]
-    Q -- Fresnel optional --> T[Angular spectrum -> inverse FFT]
+    
+    Q -- Fresnel --> T[Angular Spectrum Propagation]
     T --> U[Save sim_fresnel_z.bmp]
 ```
 
