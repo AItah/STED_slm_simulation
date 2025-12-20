@@ -1,0 +1,7 @@
+# Local Project Configuration
+model_reasoning_effort = "high"
+summary_detail = "detailed"
+
+[features]
+# Direct the agent to look at the local file for its "brain"
+project_doc_fallback_filenames = [".codex/INSTRUCTIONS.md"]
