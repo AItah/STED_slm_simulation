@@ -1,4 +1,4 @@
-function desired = make_vortex_phase(coords, ell)
+function desired = make_vortex_phase(coords, ell, sft_x, sft_y)
 %MAKE_VORTEX_PHASE Generate the vortex (spiral) desired phase: ell * theta.
 %
 %   desired = make_vortex_phase(coords, ell)
@@ -28,7 +28,7 @@ function desired = make_vortex_phase(coords, ell)
 
     % ---- Determine which coordinate system to use for theta ----
     if isfield(coords, 'X') && isfield(coords, 'Y')
-        theta = atan2(coords.Y, coords.X);  % physical angle
+        theta = atan2(coords.Y-sft_y, coords.X-sft_x);  % physical angle
     elseif isfield(coords, 'xi') && isfield(coords, 'yi')
         theta = atan2(coords.yi, coords.xi); % pixel angle fallback
     else

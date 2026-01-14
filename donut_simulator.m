@@ -7,6 +7,7 @@ clc
 %% load calibration mask for 770nm
 correction_path = [pwd '\Correction_patterns\CAL_LSH0805598_770nm.bmp'];
 calib_mask = load_grayscale_bmp(correction_path);
+save_path = "C:\WC\SelfEmployee_wc\2025\STED with Nir\Code\Simulation\SLM-control\vortex_mask_from_matlab_code";
 % % optional
 % imagesc(calib_mask);
 % colormap(gca,gray)
@@ -16,18 +17,22 @@ calib_mask = load_grayscale_bmp(correction_path);
 b_plot = false;
 use_log_view = false;       % toggle log or linear view
 
+%% ================= shift mask by =================
+sft_x = 0.3e-3; %m
+sft_y = -0.55e-3; %m
+
 %% ================= Steering user inputs =================
 theta_x_deg_user = -0.0;   % [deg]
 theta_y_deg_user =  0.00;   % [deg]
 
-Delta_x_mm_user  =  -0.00;  % [mm]
+Delta_x_mm_user  =  -0.3;  % [mm]
 Delta_y_mm_user  =  0.0;    % [mm]
 
 % Vortex control
 ell = 1;                   % topological charge (>=1)
 
 % Lens focal length
-f = 100e-3;                % [m]
+f = 200e-3;                % [m]
 
 %% ================= Mask options =================
 use_forked       = true;     % true: forked (steered +1 order). false: centered spiral
@@ -36,7 +41,7 @@ f_focus          = f;        % [m] focus distance if digital lens is used
 
 % ================= 4f optics ================= 
 P         = 1; % padding factor
-f1        = 250e-3;
+f1        = 125e-3;
 f2        = 250e-3;
 M_4f      = f2 / f1;
 pinhole_d = 100000e-6;
@@ -47,7 +52,7 @@ do_fresnel       = false;
 z_prop           = 0.10;     % [m]
 
 %% --- Phase-only encoding (superposition kinoform) ---
-dc_bias = 0.0;     % amplitude of reference wave (controls zero-order strength)
+dc_bias = 0.5;     % amplitude of reference wave (controls zero-order strength)
 gamma   = 1.0;     % weight of desired field (controls diffracted order strength)
 
 %% === Load components ===
@@ -184,15 +189,15 @@ else
     shift_tag_mm = Delta_x_act_mm;
 end
 
-mask_filename = sprintf('slm_vortex_%s_ell%d_%dx%d_%0.3fmm.bmp', ...
-    ternary(use_forked,'forked','spiral'), ell, slm.Nx, slm.Ny, shift_tag_mm);
+mask_filename = sprintf('slm_vortex_%s_ell_%d_%dx%d_%0.3fmm_sft_x_%0.3fmm_sft_y_%0.3fmm.bmp', ...
+    ternary(use_forked,'forked','spiral'), ell, slm.Nx, slm.Ny, shift_tag_mm,sft_x*1e3,sft_y*1e3);
 
 save_sim_fft_png     = true;  fft_filename     = 'sim_farfield_fft.bmp';
 save_sim_fresnel_png = true;  fresnel_filename = 'sim_fresnel_z.bmp';
 
 
 %% ===== Build phase mask =====
-vortex_mask = make_vortex_phase(coords, ell);   % ell * theta
+vortex_mask = make_vortex_phase(coords, ell,sft_x,sft_y);   % ell * theta
 
 shift_mask  = zeros(size(vortex_mask));
 lens_mask   = zeros(size(vortex_mask));
@@ -291,7 +296,7 @@ Ex = E;
 Ey = zeros(size(E));
 
 % --- Quarter-wave plate after SLM ---
-alpha = 45*pi/180;      % fast-axis angle (45° converts linear -> circular)
+alpha = 45*pi/180;      % fast-axis angle (45ï¿½ converts linear -> circular)
 delta = pi/2;           % retardance for ideal QWP at the design wavelength
 
 [Ex, Ey] = apply_waveplate(Ex, Ey, delta, alpha);
@@ -302,7 +307,7 @@ delta = pi/2;           % retardance for ideal QWP at the design wavelength
 phase_gray = slm.c2pi2unit * (phi_wrapped / (2*pi));
 primary_mask_uint8 = uint8( min(slm.c2pi2unit, round(phase_gray)));
 combined_phase = uint16(primary_mask_uint8);%+uint16(calib_mask);
-slm_img = uint8(mod(combined_phase, slm.c2pi2unit));
+slm_img = uint8(mod(combined_phase+uint16(calib_mask), slm.c2pi2unit));
 
 
 % Show & save mask
@@ -343,10 +348,11 @@ linkaxes([h_ax1, h_ax2], 'xy');
 
 
 % return
-if save_mask_png, imwrite(slm_img, mask_filename); end
+full_path = char(save_path + "\" + mask_filename)
+if save_mask_png, imwrite(slm_img, full_path); end
 
 
-
+return
 %% Quick predictions for your steering
 theta_x = fcp_x * beam.lambda_m / slm.px_side_m;      % radians (small-angle)
 theta_y = fcp_y * beam.lambda_m / slm.py_side_m;
@@ -366,7 +372,7 @@ if do_fft_farfield
     [Ny, Nx] = size(E);
 
     % ----- Choose oversampling factor in Fourier (donut) plane -----
-    P_pad  = 6;                  % e.g. 4x finer sampling
+    P_pad  = 8;                  % e.g. 4x finer sampling
     Ny_pad = P_pad * Ny;
     Nx_pad = P_pad * Nx;
 
@@ -449,6 +455,9 @@ if do_fft_farfield
     Dy = Delta_y*1e3;
     xlim([Dx-2*beam.w_0x_m*1e3 Dx+2*beam.w_0x_m*1e3]);
     ylim([Dy-2*beam.w_0y_m*1e3 Dy+2*beam.w_0y_m*1e3]);
+    
+    xlim([-0.15 0.15]);
+    ylim([-0.15 0.15]);
 end
 
 %% Sim 2: lensless propagation (Fresnel) with angular spectrum
