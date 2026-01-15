@@ -52,7 +52,7 @@ do_fresnel       = false;
 z_prop           = 0.10;     % [m]
 
 %% --- Phase-only encoding (superposition kinoform) ---
-dc_bias = 0.5;     % amplitude of reference wave (controls zero-order strength)
+dc_bias = 0.0;     % amplitude of reference wave (controls zero-order strength)
 gamma   = 1.0;     % weight of desired field (controls diffracted order strength)
 
 %% === Load components ===
@@ -184,13 +184,14 @@ save_mask_png = true;
 % - if "shift" mode, use requested shift
 % - if "angle" mode, use actual predicted shift
 if steer_mode == "shift"
-    shift_tag_mm = Delta_x_mm_user;
+    shift_tag_mm = sprintf('dx_%0.3fmm_dy_%0.3fmm',Delta_x_mm_user,Delta_y_mm_user);
+
 else
-    shift_tag_mm = Delta_x_act_mm;
+    shift_tag_mm = sprintf('dx_%0.3fmm_dy_%0.3fmm',Delta_x_act_mm,Delta_y_act_mm);;
 end
 
-mask_filename = sprintf('slm_vortex_%s_ell_%d_%dx%d_%0.3fmm_sft_x_%0.3fmm_sft_y_%0.3fmm.bmp', ...
-    ternary(use_forked,'forked','spiral'), ell, slm.Nx, slm.Ny, shift_tag_mm,sft_x*1e3,sft_y*1e3);
+mask_filename = sprintf('slm_vortex_%s_ell_%d_%dx%d_%s_maskX_%0.3fmm_maskY_%0.3fmm_dc_bias_%0.3f_gamma_%0.3f.bmp', ...
+    ternary(use_forked,'forked','spiral'), ell, slm.Nx, slm.Ny, shift_tag_mm,sft_x*1e3,sft_y*1e3,dc_bias,gamma);
 
 save_sim_fft_png     = true;  fft_filename     = 'sim_farfield_fft.bmp';
 save_sim_fresnel_png = true;  fresnel_filename = 'sim_fresnel_z.bmp';
@@ -351,8 +352,6 @@ linkaxes([h_ax1, h_ax2], 'xy');
 full_path = char(save_path + "\" + mask_filename)
 if save_mask_png, imwrite(slm_img, full_path); end
 
-
-return
 %% Quick predictions for your steering
 theta_x = fcp_x * beam.lambda_m / slm.px_side_m;      % radians (small-angle)
 theta_y = fcp_y * beam.lambda_m / slm.py_side_m;
