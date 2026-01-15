@@ -4,6 +4,8 @@ close all
 clear all
 clc
 
+only_mask = true;
+
 %% load calibration mask for 770nm
 correction_path = [pwd '\Correction_patterns\CAL_LSH0805598_770nm.bmp'];
 calib_mask = load_grayscale_bmp(correction_path);
@@ -25,14 +27,14 @@ sft_y = -0.55e-3; %m
 theta_x_deg_user = -0.0;   % [deg]
 theta_y_deg_user =  0.00;   % [deg]
 
-Delta_x_mm_user  =  -0.3;  % [mm]
+Delta_x_mm_user  =  -3.0;  % [mm]
 Delta_y_mm_user  =  0.0;    % [mm]
 
 % Vortex control
 ell = 1;                   % topological charge (>=1)
 
 % Lens focal length
-f = 200e-3;                % [m]
+f = 2000e-3;                % [m]
 
 %% ================= Mask options =================
 use_forked       = true;     % true: forked (steered +1 order). false: centered spiral
@@ -184,10 +186,10 @@ save_mask_png = true;
 % - if "shift" mode, use requested shift
 % - if "angle" mode, use actual predicted shift
 if steer_mode == "shift"
-    shift_tag_mm = sprintf('dx_%0.3fmm_dy_%0.3fmm',Delta_x_mm_user,Delta_y_mm_user);
+    shift_tag_mm = sprintf('f_focus_%.0fmm_dx_%0.3fmm_dy_%0.3fmm',f_focus*1e3,Delta_x_mm_user,Delta_y_mm_user);
 
 else
-    shift_tag_mm = sprintf('dx_%0.3fmm_dy_%0.3fmm',Delta_x_act_mm,Delta_y_act_mm);;
+    shift_tag_mm = sprintf('f_focus_%.0fmm_dx_%0.3fmm_dy_%0.3fmm',f_focus*1e3,Delta_x_act_mm,Delta_y_act_mm);;
 end
 
 mask_filename = sprintf('slm_vortex_%s_ell_%d_%dx%d_%s_maskX_%0.3fmm_maskY_%0.3fmm_dc_bias_%0.3f_gamma_%0.3f.bmp', ...
@@ -348,9 +350,12 @@ linkaxes([h_ax1, h_ax2], 'xy');
 % ylim(h_ax1, [min_y, max_y]);
 
 
-% return
 full_path = char(save_path + "\" + mask_filename)
 if save_mask_png, imwrite(slm_img, full_path); end
+
+if only_mask
+    return;
+end
 
 %% Quick predictions for your steering
 theta_x = fcp_x * beam.lambda_m / slm.px_side_m;      % radians (small-angle)
