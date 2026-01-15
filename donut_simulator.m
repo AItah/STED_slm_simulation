@@ -4,7 +4,7 @@ close all
 clear all
 clc
 
-only_mask = true;
+only_mask = false;
 
 %% load calibration mask for 770nm
 correction_path = [pwd '\Correction_patterns\CAL_LSH0805598_770nm.bmp'];
@@ -20,8 +20,8 @@ b_plot = false;
 use_log_view = false;       % toggle log or linear view
 
 %% ================= shift mask by =================
-sft_x = 0.3e-3; %m
-sft_y = -0.55e-3; %m
+sft_x = 0.3e-3*0; %m
+sft_y = -0.55e-3*0; %m
 
 %% ================= Steering user inputs =================
 theta_x_deg_user = -0.0;   % [deg]
